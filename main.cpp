@@ -40,7 +40,7 @@ int main(int argc, char** argv) {
 
     bf::Monitor mon(*bus, board);
 
-    // Hook your voltage/current/temperature/dose sensors here (e.g. INA219 over I2C or an ADC).
+    // We need voltage, current, and temperature sensors, and the data from these sensors are analyzed through the following code snippet. 
     mon.setEnvSampler([sim]() -> std::map<std::string, double> {
         if (sim) return {{"vcc_V", 3.3 + 0.01 * std::sin(bf::nowSeconds())}, {"icc_mA", 4.2}, {"temp_C", 25.0}};
         return {{"vcc_V", NAN}, {"icc_mA", NAN}, {"temp_C", NAN}, {"dose_rate", NAN}};
