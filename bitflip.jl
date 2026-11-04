@@ -1,4 +1,5 @@
 # Julia wrapper for libbitflip.so
+# Julia is used for faster propogation of the Markov Chain.
 const LIB = joinpath(@__DIR__, "libbitflip.so")
 using LinearAlgebra
 
