@@ -15,7 +15,7 @@
 namespace bf {
 
 #ifdef __linux__
-// Raspberry Pi / any Linux host: /dev/i2c-1 etc.
+
 class LinuxI2C : public I2CBus {
     int fd_ = -1;
 public:
@@ -100,4 +100,4 @@ private:
     std::mt19937 rng_;
 };
 
-} // namespace bf
+} 
