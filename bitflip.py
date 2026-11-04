@@ -1,4 +1,4 @@
-"""Python wrapper for libbitflip.so + example analysis.
+"""Python wrapper for libbitflip.so and example analysis.
 Build lib:  g++ -std=c++17 -O2 -shared -fPIC bitflip.cpp capi.cpp -o libbitflip.so
 """
 import ctypes, os
@@ -80,7 +80,7 @@ if __name__ == "__main__":
         print(f"{d}: stationary {{s: round(float(x), 3) for s, x in zip(STATES, stationary(P))}}")
         print(f"   P(clean -> any upset within 10 scans) = {1 - n_step(P, 10)[0, 0]:.3f}")
 
-    # Offline analysis from the CSV logs (works for hardware runs too)
+    # Some code for analysis of results
     try:
         import pandas as pd
         ev = pd.read_csv("bitflips.csv")
