@@ -1,5 +1,5 @@
 // BitFlipper backend - core API
-// Detects, filters, classifies and logs bit flips in the memories on BitFlip.kicad_sch
+// Detects, filters, classifies and logs bit flips in memories on PCB
 #pragma once
 #include <array>
 #include <cstdint>
@@ -10,7 +10,7 @@
 
 namespace bf {
 
-// ---------------- I2C abstraction (swap in Linux / Arduino / sim) ----------------
+// ---------------- I2C abstraction ----------------
 class I2CBus {
 public:
     virtual ~I2CBus() = default;
