@@ -1,3 +1,9 @@
+// this is the code that primarily interfaces with our hardware 
+// the purpose of this code is to feed the memory loggers with data and read back the data after "bit flips"
+// the updated code for the Teensy will be included in the repository once it is commented. 
+// Keerthana Srinivasan
+// October 23, 2026
+
 #include "bitflip.hpp"
 
 #include <algorithm>
@@ -11,11 +17,13 @@
 
 namespace bf {
 
+// logger for time
 double nowSeconds() {
     using namespace std::chrono;
     return duration<double>(system_clock::now().time_since_epoch()).count();
 }
 
+// returns the event type as a string (i.e., "SEU") which we use for analysis later
 const char* kindName(EventKind k) {
     switch (k) {
         case EventKind::SEU: return "SEU";
@@ -28,7 +36,7 @@ const char* kindName(EventKind k) {
     return "?";
 }
 
-// ---------------- Board definition (from the schematic) ----------------
+// the following is our board definition, which lays out all the PCB components. 
 // Slave addresses (verify against datasheets):
 //   CY14B101J2 memory: 1010 A2 A1 A16   FM24VN10: 1010 A2 A1 A16   M24M02: 1010 E2 A17 A16
 // Channel 0 (SC0/SD0): U1 A2A1=00 -> 0x50, U2 =01 -> 0x52, U4 =10 -> 0x54, U5 =11 -> 0x56
@@ -54,7 +62,8 @@ Monitor::Monitor(I2CBus& bus, std::vector<Device> devs, Config cfg)
     for (auto& t : trans_) t.fill(0);
 }
 
-// Address-dependent pseudo-random pattern: ~50% ones (balanced 0->1 / 1->0 stats),
+// pattern() is the answer key we follow for the byte that should be at each address. 
+// address-dependent pseudo-random pattern: ~50% ones (balanced 0->1 / 1->0 stats),
 // and it also catches address-line faults that a fixed checkerboard would miss.
 uint8_t Monitor::pattern(uint32_t seed, int dev, uint32_t a) {
     uint32_t x = a * 0x9E3779B1u ^ static_cast<uint32_t>(dev) * 0x85EBCA77u ^ seed;
@@ -64,11 +73,13 @@ uint8_t Monitor::pattern(uint32_t seed, int dev, uint32_t a) {
     return static_cast<uint8_t>(x);
 }
 
+// for now, we are only sending 2-byte memory addresses, so any extra address bits need to be moved to the I2C address
 uint8_t Monitor::devAddr(const Device& d, uint32_t addr) const {
-    uint32_t blockMask = (d.sizeBytes - 1) >> 16;   // 1 for 128 KB, 3 for 256 KB
+    uint32_t blockMask = (d.sizeBytes - 1) >> 16;  
     return static_cast<uint8_t>(d.baseAddr | ((addr >> 16) & blockMask));
 }
 
+// opens the channel we want
 bool Monitor::selectChannel(uint8_t ch) {
     if (curCh_ == ch) return true;
     uint8_t v = static_cast<uint8_t>(1u << ch);
@@ -77,12 +88,15 @@ bool Monitor::selectChannel(uint8_t ch) {
     return true;
 }
 
+// read bytes after requesting the address
 bool Monitor::readBlock(const Device& d, uint32_t addr, uint8_t* buf, size_t n) {
     if (!selectChannel(d.muxChannel)) return false;
     uint8_t w[2] = {static_cast<uint8_t>(addr >> 8), static_cast<uint8_t>(addr)};
     return bus_.writeRead(devAddr(d, addr), w, 2, buf, n);
 }
 
+// write bytes after requesting the address.
+// note that I read U3 takes longer to save data so there is a separate part for that where we will wait longer for the bytes to register before moving on
 bool Monitor::writeBlock(const Device& d, uint32_t addr, const uint8_t* buf, size_t n) {
     if (!selectChannel(d.muxChannel)) return false;
     std::vector<uint8_t> tx(n + 2);
@@ -92,16 +106,16 @@ bool Monitor::writeBlock(const Device& d, uint32_t addr, const uint8_t* buf, siz
     uint8_t a = devAddr(d, addr);
     if (!bus_.write(a, tx.data(), tx.size())) return false;
     if (d.type == MemType::EEPROM_M24M02) {
-        // EEPROM needs up to ~10 ms per page write: ACK-poll until it responds
         for (int i = 0; i < 40; ++i) {
             std::this_thread::sleep_for(std::chrono::microseconds(500));
             if (bus_.write(a, tx.data(), 2)) return true;
         }
         return false;
     }
-    return true;   // FRAM and nvSRAM write instantly
+    return true;   
 }
 
+// writing the initial pattern
 bool Monitor::writePatterns() {
     std::vector<uint8_t> buf(cfg_.chunk);
     bool ok = true;
@@ -117,6 +131,11 @@ bool Monitor::writePatterns() {
     return ok;
 }
 
+// 1. read data and compare with pattern
+// 2. to filter out false faults, re-read 3 types whenever pattern doesn't match
+// 3. if more than a quarter of the pattern is wrong, then it is likely a SEFI or the entire chip malfunctioning
+// 4. if one bit is wrong, SEU. if more than one bit is wrong, MEU.
+// 5. check if the bit can be corrected. rewrite the pattern, and if there is still an issue we mark the chip as STUCK.
 std::vector<FlipEvent> Monitor::scan() {
     ++scan_;
     std::vector<FlipEvent> ev;
@@ -140,7 +159,7 @@ std::vector<FlipEvent> Monitor::scan() {
             for (uint32_t i = 0; i < n; ++i) if (buf[i] != exp[i]) bad.push_back(i);
             if (bad.empty()) continue;
 
-            // ---- False-fault filter: a real upset reads back identically every time ----
+            // here, we use the fact that a real upset would read back the same each time, otherwise it is just noise. 
             std::vector<char> consistent(bad.size(), 1);
             bool busFail = false;
             for (int r = 0; r < cfg_.rereads && !busFail; ++r) {
@@ -157,14 +176,14 @@ std::vector<FlipEvent> Monitor::scan() {
             }
             if (real.empty()) continue;
 
-            // ---- Too many errors at once: functional interrupt / bus problem, not SEUs ----
+            // if there are too many errors at once, it is a SEFI.
             if (real.size() > cfg_.sefiFraction * n) {
                 add(a, 0, 0, EventKind::SEFI, static_cast<uint32_t>(real.size()));
                 writeBlock(d, a, exp.data(), n);
                 continue;
             }
 
-            // ---- Classify and scrub each confirmed flip ----
+            // try to write the pattern again. 
             for (uint32_t i : real) {
                 uint8_t m = exp[i] ^ buf[i];
                 EventKind k = std::bitset<8>(m).count() > 1 ? EventKind::MBU : EventKind::SEU;
@@ -184,9 +203,9 @@ std::vector<FlipEvent> Monitor::scan() {
     return ev;
 }
 
-// Group flips that are close in address within the same device and scan.
-// Note: logical address adjacency is only a proxy for physical cell adjacency
-// (die-level address scrambling is not published for these parts).
+// group flips that are close in address within the same device and scan.
+// note: logical address adjacency is only a proxy for physical cell adjacency. we need to actively reference our PCB and be more critical for this part
+// I will try to come up with better logic for this part later. 
 void Monitor::cluster(std::vector<FlipEvent>& ev) {
     std::vector<size_t> idx;
     for (size_t i = 0; i < ev.size(); ++i)
@@ -214,6 +233,9 @@ void Monitor::cluster(std::vector<FlipEvent>& ev) {
     }
 }
 
+// the purpose of the markov chain is we can propogate through faults and evaluate the probability a chip actually has a fault
+// otherwise, we may mistake a propogated SEU to be an MEU. 
+// each type of event is associated with a state. the markov chain will analyze the state propogation of each chip and from here, we can form a probability distribution. 
 void Monitor::updateMarkov(const std::vector<FlipEvent>& ev) {
     std::vector<int> state(devs_.size(), 0);
     for (const auto& e : ev) {
@@ -242,6 +264,7 @@ std::array<double, 16> Monitor::markov(int device) const {
     return P;
 }
 
+// we can save the data to bitflips.csv
 static bool fileHasData(const std::string& p) {
     std::error_code ec;
     return std::filesystem::exists(p, ec) && std::filesystem::file_size(p, ec) > 0;
