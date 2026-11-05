@@ -63,9 +63,8 @@ class BitFlipper:
         if getattr(self, "h", None):
             self.L.bf_close(self.h); self.h = None
 
-
+# converge to our stationary probability distribution
 def stationary(P):
-    """Long-run fraction of scans spent in each state."""
     w, v = np.linalg.eig(P.T)
     pi = np.real(v[:, np.argmin(abs(w - 1))])
     return pi / pi.sum()
