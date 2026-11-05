@@ -1,12 +1,18 @@
-"""Python wrapper for libbitflip.so and example analysis.
-Build lib:  g++ -std=c++17 -O2 -shared -fPIC bitflip.cpp capi.cpp -o libbitflip.so
+# Keerthana Srinivasan
+# October 23, 2026
+
+"""python wrapper for libbitflip.so and example analysis.
+to build lib:  g++ -std=c++17 -O2 -shared -fPIC bitflip.cpp capi.cpp -o libbitflip.so
 """
 import ctypes, os
 import numpy as np
 
+# kind of faults are the classication of faults
+# states are what we use in the markov chain. we don't translate all kinds to states because we're mainly observing bitflips and the rest is just extra info. 
 KINDS = ["SEU", "MBU", "STUCK", "SEFI", "READ_GLITCH", "BUS_ERROR"]
 STATES = ["clean", "SEU", "MBU", "fault"]
 
+# all of our events from earlier
 class Event(ctypes.Structure):
     _fields_ = [("scan", ctypes.c_uint64), ("t", ctypes.c_double), ("device", ctypes.c_int32),
                 ("addr", ctypes.c_uint32), ("expected", ctypes.c_uint8), ("observed", ctypes.c_uint8),
