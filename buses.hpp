@@ -1,3 +1,8 @@
+// this is mostly for just simulating the code b/c I couldn't use the PCB earlier
+// note. I used Claude for this part to save time. also b/c I didn't have much experience with this part. 
+// Keerthana Srinivasan
+// October 23, 2026
+
 #pragma once
 #include "bitflip.hpp"
 #include <random>
@@ -39,8 +44,7 @@ public:
 };
 #endif
 
-// Simulated board: emulates the mux + all 7 memories, injects real upsets
-// and transient read glitches so you can test the pipeline with no hardware.
+// I made a simulated board just to make sure the code works. It emulates the mux and all 7 memories and injects  upsets
 class SimBus : public I2CBus {
 public:
     SimBus(std::vector<Device> devs, uint8_t mux = 0x70, double glitchPerByte = 1e-6, uint32_t seed = 1)
