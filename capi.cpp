@@ -1,4 +1,7 @@
 // C ABI so Python (ctypes) and Julia (ccall) can drive the monitor directly.
+// I used Claude for snippets and filled in some parts myself once I learned more, b/c this was my first time integrating Julia, Python, and C++.
+// Keerthana Srinivasan 
+// October 23, 2026
 #include "bitflip.hpp"
 #include "buses.hpp"
 #include <memory>
