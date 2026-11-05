@@ -1,6 +1,9 @@
-// bitflip_monitor --sim                 run against simulated board
-// bitflip_monitor --dev /dev/i2c-1      run on hardware
-// options: --scans N (0 = forever), --interval SECONDS, --no-fill (keep existing contents)
+// this is to run everything.
+// Keerthana Srinivasan 
+// October 23, 2026
+// bitflip_monitor --sim                if we want to run against simulated board
+// bitflip_monitor --dev /dev/i2c-1     if we want to run on hardware
+// some options: --scans N (0 = forever), --interval SECONDS, --no-fill (keep existing contents)
 #include "bitflip.hpp"
 #include "buses.hpp"
 
