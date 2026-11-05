@@ -1,5 +1,6 @@
-// BitFlipper backend - core API
-// Detects, filters, classifies and logs bit flips in memories on PCB
+// this is the code that directly interfaces with our hardware to write the bits. 
+// Keerthana Srinivasan
+// October 23, 2026
 #pragma once
 #include <array>
 #include <cstdint>
@@ -10,7 +11,7 @@
 
 namespace bf {
 
-// ---------------- I2C abstraction ----------------
+// I2C abstraction
 class I2CBus {
 public:
     virtual ~I2CBus() = default;
@@ -52,7 +53,7 @@ struct FlipEvent {
     uint8_t   mask;       // expected ^ observed (which bits flipped)
     EventKind kind;
     int       cluster;    // events sharing an id are spatially adjacent in one scan
-    uint32_t  nBytes;     // bytes affected (1 normally, chunk count for SEFI)
+    uint32_t  nBytes;     // bytes affected 
 };
 
 struct Config {
@@ -61,7 +62,7 @@ struct Config {
     int         rereads        = 3;        // re-reads used to reject false faults
     uint32_t    seed           = 0xB17F11B;
     double      sefiFraction   = 0.25;     // > this fraction of chunk wrong -> SEFI
-    uint32_t    clusterDist    = 2;        // bytes; flips this close in one scan -> same cluster
+    uint32_t    clusterDist    = 2;        // bytes
     std::string csvPath        = "bitflips.csv";
     std::string envCsvPath     = "scans.csv";
 };
@@ -73,12 +74,13 @@ class Monitor {
 public:
     Monitor(I2CBus& bus, std::vector<Device> devs, Config cfg = {});
 
-    bool writePatterns();               // fill every device with the reference pattern
+    bool writePatterns();               // we can fill every device with the reference pattern
     std::vector<FlipEvent> scan();      // one full pass over all memories
     void setEnvSampler(EnvSampler s) { env_ = std::move(s); }
 
-    // Markov transition matrix for a device, row-major 4x4.
-    // States: 0 clean, 1 SEU, 2 MBU, 3 fault (SEFI/STUCK/BUS)
+    // markov transition matrix for a device, row-major 4x4.
+// note. I will edit this over the course of the semester as we make changed to the PCB. 
+    // states: 0 clean, 1 SEU, 2 MBU, 3 fault (SEFI/STUCK/BUS)
     std::array<double, 16>   markov(int device) const;
     std::array<uint64_t, 16> markovCounts(int device) const { return trans_[device]; }
 
@@ -110,7 +112,7 @@ private:
     std::vector<std::string> envKeys_;
 };
 
-// Device table matching BitFlip.kicad_sch
+// device table matching BitFlip.kicad_sch
 std::vector<Device> bitflipBoard();
 
 double nowSeconds();
